@@ -542,7 +542,10 @@ pub fn write_circuit_to_svg(circuit: &Circuit, layout: &SchematicLayout, name: &
 
 fn write_to_svg(instance: &PartInstance, layout: &SchematicLayout, name: &str) {
     let r = estimate_instance_bounding_box(instance, &layout);
-    let mut top_document = Document::new().set("viewBox", (-2000, -2000, 4000, 4000));
+    let mut top_document = Document::new()
+        .set("viewBox", (r.p0.x, r.p0.y, r.p1.x-r.p0.x, r.p1.y-r.p0.y))
+        .set("width", (r.p1.x-r.p0.x))
+        .set("height", (r.p1.y-r.p0.y));
     let document = make_group_from_part_instance(instance, &layout);
     top_document = top_document.add(document);
     top_document = top_document.add(
