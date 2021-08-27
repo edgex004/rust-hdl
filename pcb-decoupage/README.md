@@ -6,7 +6,9 @@ PCB Decoupage is a routing and placement tool for rust-hdl-pcb schematics.
 
 1. [Install yarn.](https://classic.yarnpkg.com/en/docs/install)
 2. [Follow tauri setup instructions for your platform.](https://tauri.studio/en/docs/getting-started/intro)
-2. `yarn install`
+3. Generate test symbols with rust-hdl-pcb
+4. `yarn install`
+5. `yarn copy_images`
 
 ## Development Server
 

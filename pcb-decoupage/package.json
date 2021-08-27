@@ -8,7 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "copy_images": "cp -f ../rust-hdl-pcb/symbols/* ./src/assets/images/"
   },
   "private": true,
   "dependencies": {

@@ -403,7 +403,7 @@ fn make_group_from_part_instance(instance: &PartInstance, layout: &SchematicLayo
     let dx = schematic_orientation.center.0;
     let dy = -schematic_orientation.center.1;
     let transform = format!(
-        "{rot} translate({x},{y})",
+        "scale(0.1,0.1) {rot} translate({x},{y})",
         x = dx,
         y = dy,
         rot = if schematic_orientation.rotation == SchematicRotation::Vertical {
@@ -543,9 +543,9 @@ pub fn write_circuit_to_svg(circuit: &Circuit, layout: &SchematicLayout, name: &
 fn write_to_svg(instance: &PartInstance, layout: &SchematicLayout, name: &str) {
     let r = estimate_instance_bounding_box(instance, &layout);
     let mut top_document = Document::new()
-        .set("viewBox", (r.p0.x, r.p0.y, r.p1.x-r.p0.x, r.p1.y-r.p0.y))
-        .set("width", (r.p1.x-r.p0.x))
-        .set("height", (r.p1.y-r.p0.y));
+        .set("viewBox", (r.p0.x/10, r.p0.y/10, (r.p1.x-r.p0.x)/10, (r.p1.y-r.p0.y)/10))
+        .set("width", (r.p1.x-r.p0.x)/10)
+        .set("height", (r.p1.y-r.p0.y)/10);
     let document = make_group_from_part_instance(instance, &layout);
     top_document = top_document.add(document);
     top_document = top_document.add(

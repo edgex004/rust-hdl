@@ -1,2 +1,6 @@
-<img id="drag-1" class="draggable" src="assets/images/74LVC1G125SE-7.svg">
-<img id="drag-2" class="draggable" src="assets/images/74LVC1G125SE-7.svg">
+<div>
+  <button mat-button onclick="handleSaveJsonClicked()">Save JSON</button>
+</div>
+
+
+<img *ngFor="let part of parts" id="{{part.id}}" class="draggable" src="assets/images/{{part.image}}" [style.left.px]="part.x" [style.top.px]="part.y">

@@ -1,5 +1,13 @@
 import { Component } from '@angular/core';
-// import { DomSanitizer} from '@angular/platform-browser';
+// // With the Tauri API npm package:
+// import * as tauri from '@tauri-apps/api/tauri'
+// // With the Tauri global script, enabled when `tauri.conf.json > build > withGlobalTauri` is set to true:
+// const invoke = window.__TAURI__.invoke
+
+// // Invoke the command
+// invoke('my_custom_command')
+
+import data from '../assets/pcb_lists/pcb_list.json';
 
 
 
@@ -10,23 +18,21 @@ import { Component } from '@angular/core';
 })
 export class AppComponent {
   title = 'pcb-decoupage';
-  // eulaContent = {};
+  image_path = '';
+  parts:any = [];
 
-  // constructor (private sanitizer: DomSanitizer){}
+  constructor (){}
   
-  // ngOnInit(){
-  //   // <img src="assets/images/74LVC1G125SE-7_lr_ud.svg">
+  ngOnInit(){
+    this.parts = data.parts;
+    this.image_path='assets/images/74LVC1G125SE-7.svg';
+  }
 
-  //   fetch('assets/images/74LVC1G125SE-7_lr_ud.svg').then(res => res.text()).then(data => {
-  //     this.eulaContent = this.sanitizer.bypassSecurityTrustHtml(data);
-  //     var svg = document.getElementsByTagName("svg")[0];
-  //     var bbox = svg.getBBox({clipped:true,fill:false,markers:true,stroke:false});
-  //     var viewBox = [bbox.x, bbox.y, bbox.width, bbox.height].join(" ");
-  //     svg.setAttribute("viewBox", viewBox);
-    
-  //   })
-
-  // }
-  
+  handleSaveJsonClicked(){
+    // var draggables = document.getElementsByClassName("draggable");
+    // for (var i = 0; i < draggables.length; i++) {
+    //   console.log(draggables[i].id);
+    // }
+  }
 }
 
