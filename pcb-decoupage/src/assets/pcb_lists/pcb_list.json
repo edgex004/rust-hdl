@@ -1,0 +1,22 @@
+{
+    "parts": [
+        {
+            "id": "circuit1",
+            "image": "74LVC1G125SE-7.svg",
+            "x":100.0,
+            "y":200.0
+        },
+        {
+            "id": "circuit2",
+            "image": "74LVC1G125SE-7.svg",
+            "x":400.0,
+            "y":200.0
+        },
+        {
+            "id": "circuit3",
+            "image": "74LVC1G125SE-7.svg",
+            "x":900.0,
+            "y":400.0
+        }
+    ]
+}
