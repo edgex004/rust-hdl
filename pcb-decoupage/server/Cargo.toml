@@ -1,0 +1,13 @@
+[package]
+name = "pcb-decaupage"
+version = "0.0.1"
+edition = "2018"
+publish = false
+
+[dependencies]
+rocket = "0.5.0-rc.1"
+open = "2.0.1"
+serde = "1.0.130"
+rust-embed={version = "6.0.1",features = ["nightly"] }
+
+[workspace]

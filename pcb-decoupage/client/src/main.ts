@@ -59,7 +59,7 @@ function dragMoveListener (event: any) {
 }
 
 declare global {
-  interface Window { dragMoveListener: any; __TAURI__: any; }
+  interface Window { dragMoveListener: any; }
 }
 
 // this function is used later in the resizing and gesture demos

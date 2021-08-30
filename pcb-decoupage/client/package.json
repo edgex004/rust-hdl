@@ -1,6 +1,6 @@
 {
-  "name": "pcb-decoupage",
-  "version": "0.0.0",
+  "name": "pcb-decoupage-client",
+  "version": "0.0.1",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -8,7 +8,6 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
-    "tauri": "tauri",
     "copy_images": "cp -f ../rust-hdl-pcb/symbols/* ./src/assets/images/"
   },
   "private": true,
@@ -38,7 +37,6 @@
     "@angular-eslint/template-parser": "12.3.1",
     "@angular/cli": "~12.2.2",
     "@angular/compiler-cli": "~12.2.0",
-    "@tauri-apps/cli": "^1.0.0-beta.10",
     "@types/jasmine": "~3.8.0",
     "@types/node": "^12.11.1",
     "@typescript-eslint/eslint-plugin": "4.28.2",
