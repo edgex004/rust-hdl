@@ -58,6 +58,18 @@ fn dist<'r>(file: PathBuf) -> Result<(ContentType, String), Status> {
   )
 }
 
+fn default_launch_browser() -> bool {
+    true
+}
+
+fn default_address() -> String {
+    String::from("0.0.0.0")
+}
+
+fn default_port() -> u16 {
+    8000
+}
+
 #[rocket::launch]
 fn rocket() -> _ {
     let rocket = rocket::build();
@@ -67,8 +79,11 @@ fn rocket() -> _ {
 
     #[derive(Deserialize)]
     struct Config {
+        #[serde(default = "default_launch_browser")]
         launch_browser: bool,
+        #[serde(default = "default_address")]
         address: String,
+        #[serde(default = "default_port")]
         port: u16,
     }
 
