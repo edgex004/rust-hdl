@@ -1,6 +1,26 @@
-<div>
-  <button mat-button onclick="handleSaveJsonClicked()">Save JSON</button>
+
+
+
+<div id="maincontent">
+  <img *ngFor="let part of parts" id="{{part.id}}" class="draggable" src="assets/images/{{part.image}}" [style.left.px]="part.x" [style.top.px]="part.y">
+  <div id="testRawSVG" class="draggable"></div>
 </div>
 
 
-<img *ngFor="let part of parts" id="{{part.id}}" class="draggable" src="assets/images/{{part.image}}" [style.left.px]="part.x" [style.top.px]="part.y">
+<div>
+  <button mat-button onclick="handleSaveJsonClicked()">Save JSON</button>
+  <form [formGroup]="sizeForm" (ngSubmit)="handleSizeFormSubmitted()">
+    <label for="sizeForm">
+      Enter new canvas size here:
+    </label>
+    <div>
+      <input id="width" type="text" formControlName="width">
+       x 
+      <input id="height" type="text" formControlName="height">
+      | scale: 
+      <input id="scale" type="text" formControlName="scale">
+      <button button class="btn btn-outline-primary btn-sm" type="submit">Change Size</button>
+    </div>
+  </form>
+
+</div>

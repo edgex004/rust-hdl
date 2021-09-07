@@ -8,7 +8,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
-    "copy_images": "cp -f ../rust-hdl-pcb/symbols/* ./src/assets/images/"
+    "copy_images": "cp -f ../../rust-hdl-pcb/symbols/* ./src/assets/images/"
   },
   "private": true,
   "dependencies": {

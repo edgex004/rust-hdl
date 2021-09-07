@@ -11,7 +11,7 @@ client/node_modules:
 client/dist: client/node_modules $(CLIENT_SRC_FILES)
 	cd client && npm run copy_images && ng build
 
-server/target/release: $(DIST_FILES) $(SERVER_SRC_FILES)
+server/target/release: client/dist $(DIST_FILES) $(SERVER_SRC_FILES)
 	cd server && cargo build --release
 
 pcb-decoupage: server/target/release
