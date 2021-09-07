@@ -14,10 +14,17 @@ use rocket::response::content;
 // use rocket::response::content::Html;
 use rocket::Request;
 use rocket::serde::Deserialize;
+use rocket::figment::{Figment, providers::{Toml, Env, Format}};
+use rocket::fairing::{self, AdHoc};
+use std::net::SocketAddr;
 
 #[derive(RustEmbed)]
 #[folder = "../client/dist/pcb-decoupage"]
 struct Asset;
+
+#[derive(RustEmbed)]
+#[folder = "./config"]
+struct ConfigFolder;
 
 
 #[catch(404)]
@@ -62,39 +69,40 @@ fn default_launch_browser() -> bool {
     true
 }
 
-fn default_address() -> String {
-    String::from("0.0.0.0")
-}
-
-fn default_port() -> u16 {
-    8000
-}
-
 #[rocket::launch]
 fn rocket() -> _ {
-    let rocket = rocket::build();
-    
 
-    let figment = rocket.figment();
+  let config_str=ConfigFolder::get("PCBDecoupage.toml").map_or_else(
+    || Err("missing toml"),
+    |d| Ok(String::from_utf8(d.data.as_ref().to_vec()).unwrap()),
+  ).unwrap();
+  let figment = Figment::from(rocket::Config::default())
+  .merge(Toml::string(&config_str).nested())
+  .merge(Env::prefixed("PCB_DECOUPAGE_").global());
 
-    #[derive(Deserialize)]
-    struct Config {
-        #[serde(default = "default_launch_browser")]
-        launch_browser: bool,
-        #[serde(default = "default_address")]
-        address: String,
-        #[serde(default = "default_port")]
-        port: u16,
-    }
 
-    let config: Config = figment.extract().expect("config");
-    
+  let rocket = rocket::custom(figment);
+  
+
+  let figment = rocket.figment();
+
+  #[derive(Deserialize)]
+  struct Config {
+      #[serde(default = "default_launch_browser")]
+      launch_browser: bool,
+      address: String,
+      port: u16,
+  }
+
+  let config: Config = figment.extract().expect("config");
+  
+  rocket
+  .mount("/", routes![index, dist])
+  .register("/", catchers![not_found])
+  .attach(AdHoc::on_liftoff("Liftoff Message", |rkt| Box::pin(async move {
     if config.launch_browser {
-        open::that(format!("http://{}:{}",config.address, config.port)).ok();
+      open::that(format!("http://{}:{}",rkt.config().address, rkt.config().port)).ok();
     }
-    
-    rocket
-    .mount("/", routes![index, dist])
-    .register("/", catchers![not_found])
+  })))
 
 }
