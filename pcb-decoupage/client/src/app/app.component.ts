@@ -3,7 +3,9 @@ import { FormArray, FormBuilder, FormGroup } from '@angular/forms';
 
 import data from '../assets/pcb_lists/pcb_list.json';
 import interact from 'interactjs';
+import { greet } from 'pcb-to-svg';
 
+greet();
 
 declare global {
   interface Window { dragMoveListener: any; }

@@ -1,6 +1,8 @@
+//noinspection RsMainFunctionNotFound
 #![feature(decl_macro, proc_macro_hygiene)]
 #[macro_use]
 extern crate rocket;
+use rocket::{Rocket};
 
 use rocket::http::{ContentType, Status};
 // use rocket::response;
@@ -15,8 +17,7 @@ use rocket::response::content;
 use rocket::Request;
 use rocket::serde::Deserialize;
 use rocket::figment::{Figment, providers::{Toml, Env, Format}};
-use rocket::fairing::{self, AdHoc};
-use std::net::SocketAddr;
+use rocket::fairing::{ AdHoc };
 
 #[derive(RustEmbed)]
 #[folder = "../client/dist/pcb-decoupage"]
@@ -48,19 +49,39 @@ fn index<'r>() -> Result<content::Html<String>,Status> {
   )
 }
 
+#[derive(Responder)]
+enum StrOrVecResponse {
+    Str(String),
+    Vec(Vec<u8>),
+    StrAndContent(String, ContentType),
+    VecAndContent(Vec<u8>, ContentType),
+}
+
 #[get("/<file..>")]
-fn dist<'r>(file: PathBuf) -> Result<(ContentType, String), Status> {
+fn dist<'r>(file: PathBuf) -> Result<StrOrVecResponse, Status> {
   let filename = file.display().to_string();
   Asset::get(&filename).map_or_else(
     || Err(Status::NotFound),
     |d| {
-      let ext = file
-        .as_path()
-        .extension()
-        .and_then(OsStr::to_str)
-        .ok_or_else(|| Status::new(400))?;
-      let content_type = ContentType::from_extension(ext).ok_or_else(|| Status::new(400))?;
-      Ok((content_type, String::from_utf8(d.data.as_ref().to_vec()).unwrap()))
+      let ext_path = file.as_path();
+      let ext_type = ext_path.extension().ok_or_else(|| Status::new(400))?;
+      let ext =   OsStr::to_str(ext_type).ok_or_else(|| Status::new(400))?;
+      let try_content_type = ContentType::from_extension(ext);
+
+      match String::from_utf8(d.data.as_ref().to_vec()) {
+        Ok(v) => {
+            match try_content_type {
+                Some(c) => Ok(StrOrVecResponse::StrAndContent(v, c)),
+                None => Ok(StrOrVecResponse::Str(v))
+            }
+        },
+        Err(_) => {
+            match try_content_type {
+                Some(c) => Ok(StrOrVecResponse::VecAndContent(d.data.as_ref().to_vec(), c)),
+                None => Ok(StrOrVecResponse::Vec(d.data.as_ref().to_vec()))
+            }
+        },
+    }
     },
   )
 }
@@ -69,8 +90,9 @@ fn default_launch_browser() -> bool {
     true
 }
 
+//noinspection RsMainFunctionNotFound
 #[rocket::launch]
-fn rocket() -> _ {
+fn rocket() -> Rocket<rocket::Build> {
 
   let config_str=ConfigFolder::get("PCBDecoupage.toml").map_or_else(
     || Err("missing toml"),
@@ -90,8 +112,6 @@ fn rocket() -> _ {
   struct Config {
       #[serde(default = "default_launch_browser")]
       launch_browser: bool,
-      address: String,
-      port: u16,
   }
 
   let config: Config = figment.extract().expect("config");

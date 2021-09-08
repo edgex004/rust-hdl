@@ -5,7 +5,7 @@ DIST_FILES = $(shell find ./client/dist -type f -name '*')
 
 all: pcb-decoupage
 
-client/node_modules:
+client/node_modules: client/package.json
 	cd client && npm install
 
 client/dist: client/node_modules $(CLIENT_SRC_FILES)
