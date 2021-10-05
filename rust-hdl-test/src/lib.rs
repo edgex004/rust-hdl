@@ -3,9 +3,12 @@ use std::fs::File;
 use rust_hdl_core::prelude::*;
 use rust_hdl_macros::LogicBlock;
 use rust_hdl_synth::yosys_validate;
+use rust_hdl_widgets::prelude::Shot;
 use rust_hdl_widgets::strobe::Strobe;
+use std::time::Duration;
 
 pub mod ad7193_sim;
+pub mod ads868x_sim;
 pub mod alchitry_cu_icepll;
 pub mod alchitry_cu_pulser;
 pub mod alchitry_cu_pulser_pll;
@@ -13,32 +16,43 @@ pub mod alchitry_cu_pwm;
 pub mod alchitry_cu_pwm_vec;
 pub mod alchitry_cu_pwm_vec_srom;
 pub mod base_tests;
-mod edge_detector;
+pub mod edge_detector;
+pub mod expander;
 pub mod fifo;
-mod muxed_ad7193_sim;
+pub mod muxed_ad7193_sim;
+pub mod muxed_ads868x_sim;
 pub mod nested_ports;
 #[cfg(feature = "fpga_hw_test")]
 pub mod ok_tools;
 #[cfg(feature = "fpga_hw_test")]
-pub mod opalkelly_xem_6010_blinky;
+pub mod opalkelly_blinky;
+#[cfg(feature = "fpga_hw_test")]
+pub mod opalkelly_download;
+#[cfg(feature = "fpga_hw_test")]
+pub mod opalkelly_mux_spi;
+#[cfg(feature = "fpga_hw_test")]
+pub mod opalkelly_pipe;
+#[cfg(feature = "fpga_hw_test")]
+pub mod opalkelly_spi;
+#[cfg(feature = "fpga_hw_test")]
+pub mod opalkelly_wave;
+#[cfg(feature = "fpga_hw_test")]
+pub mod opalkelly_wire;
 #[cfg(feature = "fpga_hw_test")]
 pub mod opalkelly_xem_6010_ddr;
 #[cfg(feature = "fpga_hw_test")]
 pub mod opalkelly_xem_6010_mig;
 #[cfg(feature = "fpga_hw_test")]
-pub mod opalkelly_xem_6010_pipe;
-//#[cfg(feature = "fpga_hw_test")]
-pub mod opalkelly_xem_6010_spi;
+pub mod opalkelly_xem_7010_ddr;
 #[cfg(feature = "fpga_hw_test")]
-pub mod opalkelly_xem_6010_wave;
-#[cfg(feature = "fpga_hw_test")]
-pub mod opalkelly_xem_6010_wire;
+pub mod opalkelly_xem_7010_mig;
 pub mod pwm;
 pub mod ram;
+pub mod reducer;
 pub mod rom;
 pub mod snore;
-mod spi;
-mod sync_rom;
+pub mod spi;
+pub mod sync_rom;
 
 const MHZ1: u64 = 1_000_000;
 
@@ -70,7 +84,9 @@ fn test_strobe_as_verilog() {
 #[test]
 fn test_strobe() {
     let mut sim = Simulation::new();
-    sim.add_clock(5, |x: &mut UUT| x.strobe.clock.next = !x.strobe.clock.val());
+    sim.add_clock(5, |x: &mut Box<UUT>| {
+        x.strobe.clock.next = !x.strobe.clock.val()
+    });
     sim.add_testbench(|mut sim: Sim<UUT>| {
         let mut x = sim.init()?;
         x.strobe.enable.next = true;
@@ -82,6 +98,34 @@ fn test_strobe() {
         strobe: Strobe::new(MHZ1, 10.0),
     };
     uut.connect_all();
-    sim.run_traced(uut, 100_000, File::create("strobe.vcd").unwrap())
+    sim.run_traced(Box::new(uut), 100_000, File::create("strobe.vcd").unwrap())
         .unwrap();
+}
+
+#[test]
+fn test_shot() {
+    let mut shot: Shot<32> = Shot::new(1_000_000, Duration::from_millis(1));
+    shot.trigger.connect();
+    shot.clock.connect();
+    shot.connect_all();
+    let mut sim = Simulation::new();
+    sim.add_clock(5, |x: &mut Box<Shot<32>>| x.clock.next = !x.clock.val());
+    sim.add_testbench(|mut sim: Sim<Shot<32>>| {
+        let mut x = sim.init()?;
+        wait_clock_true!(sim, clock, x);
+        x.trigger.next = true;
+        wait_clock_cycle!(sim, clock, x);
+        x.trigger.next = false;
+        x = sim.watch(|x| x.fired.val(), x)?;
+        wait_clock_cycle!(sim, clock, x);
+        sim_assert!(sim, !x.fired.val(), x);
+        wait_clock_cycle!(sim, clock, x);
+        sim.done(x)
+    });
+    sim.run_traced(
+        Box::new(shot),
+        10_0000,
+        std::fs::File::create("shot.vcd").unwrap(),
+    )
+    .unwrap();
 }

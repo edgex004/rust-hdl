@@ -1,22 +1,19 @@
 use crate::ok_tools::ok_test_prelude;
 use rust_hdl_core::prelude::*;
-use rust_hdl_ok::ddr_fifo::DDRFIFO;
-use rust_hdl_ok::mcb_if::MCBInterface;
+use rust_hdl_ok::mcb_if::MCBInterface1GDDR2;
 use rust_hdl_ok::ok_download_ddr::OpalKellyDDRBackedDownloadFIFO;
 use rust_hdl_ok::ok_hi::OpalKellyHostInterface;
 use rust_hdl_ok::ok_host::OpalKellyHost;
-use rust_hdl_ok::ok_pipe::BTPipeOut;
 use rust_hdl_ok::ok_wire::WireIn;
-use rust_hdl_ok::pins::{xem_6010_base_clock, xem_6010_leds};
+use rust_hdl_ok::pins::xem_6010_base_clock;
 use rust_hdl_ok_frontpanel_sys::{make_u16_buffer, OkError};
-use rust_hdl_widgets::fifo_reducer::FIFOReducer;
 use rust_hdl_widgets::prelude::*;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 #[derive(LogicBlock)]
 struct OpalKellyDownloadDDRFIFOStressTest {
-    mcb: MCBInterface,
+    mcb: MCBInterface1GDDR2,
     hi: OpalKellyHostInterface,
     ok_host: OpalKellyHost,
     download: OpalKellyDDRBackedDownloadFIFO,
@@ -31,9 +28,9 @@ struct OpalKellyDownloadDDRFIFOStressTest {
 impl Default for OpalKellyDownloadDDRFIFOStressTest {
     fn default() -> Self {
         Self {
-            mcb: MCBInterface::xem_6010(),
+            mcb: MCBInterface1GDDR2::xem_6010(),
             hi: OpalKellyHostInterface::xem_6010(),
-            ok_host: OpalKellyHost::default(),
+            ok_host: OpalKellyHost::xem_6010(),
             download: OpalKellyDDRBackedDownloadFIFO::new(0xA0),
             count_in: Default::default(),
             raw_sys_clock: xem_6010_base_clock(),
@@ -71,18 +68,18 @@ impl Logic for OpalKellyDownloadDDRFIFOStressTest {
 }
 
 #[test]
-fn test_opalkelly_xem_6010_ddr_stress() {
+fn test_opalkelly_xem_6010_synth_ddr_stress() {
     let mut uut = OpalKellyDownloadDDRFIFOStressTest::default();
-    uut.hi.link_connect_connect();
-    uut.mcb.link_connect_connect();
+    uut.hi.link_connect_dest();
+    uut.mcb.link_connect_dest();
     uut.raw_sys_clock.connect();
     uut.connect_all();
-    crate::ok_tools::synth_obj(uut, "opalkelly_xem_6010_ddr_stress");
+    crate::ok_tools::synth_obj_6010(uut, "opalkelly_xem_6010_ddr_stress");
 }
 
-#[test]
-fn test_opalkelly_xem_6010_ddr_stress_runtime() -> Result<(), OkError> {
-    let hnd = ok_test_prelude("opalkelly_xem_6010_ddr_stress/top.bit")?;
+#[cfg(test)]
+pub(crate) fn test_opalkelly_ddr_stress_runtime(bit_file: &str) -> Result<(), OkError> {
+    let hnd = ok_test_prelude(bit_file)?;
     hnd.reset_firmware(0);
     sleep(Duration::from_millis(100));
     hnd.set_wire_in(1, 1);
@@ -105,8 +102,8 @@ fn test_opalkelly_xem_6010_ddr_stress_runtime() -> Result<(), OkError> {
             let hi_word = data_shorts[2 * i + 1] as u32;
             data_words.push((hi_word << 16) | lo_word);
         }
-        for (ndx, val) in data_words.iter().enumerate() {
-            assert_eq!(((counter as u128) & 0xFFFFFFFF_u128) as u32, *val);
+        for val in data_words {
+            assert_eq!(((counter as u128) & 0xFFFFFFFF_u128) as u32, val);
             counter += 1;
         }
     }
@@ -114,4 +111,9 @@ fn test_opalkelly_xem_6010_ddr_stress_runtime() -> Result<(), OkError> {
     hnd.update_wire_ins();
     hnd.close();
     Ok(())
+}
+
+#[test]
+fn test_opalkelly_xem_6010_ddr_stress() -> Result<(), OkError> {
+    test_opalkelly_ddr_stress_runtime("opalkelly_xem_6010_ddr_stress/top.bit")
 }

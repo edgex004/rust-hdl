@@ -8,6 +8,8 @@ use std::process::Command;
 pub enum SynthError {
     SynthesisFailed { stdout: String, stderr: String },
     LatchingWriteToSignal(Vec<String>),
+    ImplicitlyDeclared(Vec<String>),
+    DuplicateModule(Vec<String>),
     IOError(std::io::Error),
 }
 
@@ -39,8 +41,25 @@ pub fn yosys_validate(prefix: &str, translation: &str) -> Result<(), SynthError>
         let mut dump = File::create("yosys.v")?;
         write!(dump, "{}", translation).unwrap();
     }
+    if stdout.contains("Re-dfinition of") {
+        let regex = regex::Regex::new(r#"Re-definition of module (\S*)"#).unwrap();
+        let mut signal_name = vec![];
+        if regex.is_match(&stdout) {
+            for capture in regex.captures(&stdout).unwrap().iter() {
+                signal_name.push(capture.unwrap().as_str().to_string());
+            }
+        }
+        return Err(SynthError::DuplicateModule(signal_name));
+    }
     if stdout.contains("implicitly declared.") {
-        return Err(SynthError::SynthesisFailed { stdout, stderr });
+        let regex = regex::Regex::new(r#"Identifier (\S*) is implicitly declared"#).unwrap();
+        let mut signal_name = vec![];
+        if regex.is_match(&stdout) {
+            for capture in regex.captures(&stdout).unwrap().iter() {
+                signal_name.push(capture.unwrap().as_str().to_string());
+            }
+        }
+        return Err(SynthError::ImplicitlyDeclared(signal_name));
     }
     if stdout.contains("Latch inferred for") {
         let regex = regex::Regex::new(r#"Latch inferred for signal (\S*)"#).unwrap();

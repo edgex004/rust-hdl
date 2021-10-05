@@ -2,10 +2,8 @@ use crate::ok_pipe::{PipeIn, PipeOut};
 use crate::ok_trigger::{TriggerIn, TriggerOut};
 use crate::prelude::WireIn;
 use rust_hdl_core::prelude::*;
-use rust_hdl_synth::TopWrap;
 use rust_hdl_widgets::prelude::*;
 use rust_hdl_widgets::spi_master::{SPIConfig, SPIMaster, SPIWires};
-use rust_hdl_widgets::spi_slave::SPISlave;
 
 #[derive(Copy, Clone, Debug)]
 pub struct OKSPIMasterAddressConfig {
@@ -23,7 +21,7 @@ impl Default for OKSPIMasterAddressConfig {
             pipe_out_address: 0xA0,
             trigger_start_address: 0x40,
             trigger_done_address: 0x60,
-            wire_bits_address: 0x01,
+            wire_bits_address: 0x00,
         }
     }
 }
@@ -131,7 +129,7 @@ fn test_ok_spi_master_synthesizes() {
         cpha: true,
         cpol: true,
     };
-    let mut uut = TopWrap::new(OKSPIMaster::new(Default::default(), spi_config));
+    let mut uut = rust_hdl_synth::TopWrap::new(OKSPIMaster::new(Default::default(), spi_config));
     uut.uut.wires.link_connect_dest();
     uut.uut.ok1.connect();
     uut.uut.clock.connect();
@@ -200,7 +198,7 @@ fn test_ok_spi_master_works() {
     uut.connect_all();
     rust_hdl_synth::yosys_validate("ok_spi", &generate_verilog(&uut)).unwrap();
     let mut sim = Simulation::new();
-    sim.add_clock(5, |x: &mut TopOK| x.clock.next = !x.clock.val());
+    sim.add_clock(5, |x: &mut Box<TopOK>| x.clock.next = !x.clock.val());
     sim.add_testbench(move |mut sim: Sim<TopOK>| {
         let mut x = sim.init()?;
         wait_clock_true!(sim, clock, x);
@@ -235,6 +233,10 @@ fn test_ok_spi_master_works() {
         }
         sim.done(x)
     });
-    sim.run_traced(uut, 100_000, std::fs::File::create("ok_spi.vcd").unwrap())
-        .unwrap()
+    sim.run_traced(
+        Box::new(uut),
+        100_000,
+        std::fs::File::create("ok_spi.vcd").unwrap(),
+    )
+    .unwrap()
 }

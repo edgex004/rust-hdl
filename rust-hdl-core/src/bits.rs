@@ -136,6 +136,14 @@ impl<const N: usize> Bits<N> {
         }
     }
 
+    #[inline(always)]
+    pub fn xor(&self) -> bool {
+        match self {
+            Bits::Short(x) => x.xor(),
+            Bits::Long(x) => x.xor(),
+        }
+    }
+
     pub fn index(&self) -> usize {
         match self {
             Bits::Short(x) => x.short() as usize,
@@ -682,7 +690,7 @@ mod tests {
         let a = bits::<A_WIDTH>(153);
         println!("{:x}", a);
         assert_eq!(a.len(), 8);
-        assert_eq!(clog2(1024), 11);
+        assert_eq!(clog2(1024), 10);
     }
     #[test]
     fn test_clog2_inline() {

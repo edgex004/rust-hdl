@@ -7,6 +7,7 @@ use rust_hdl_core::prelude::*;
 #[derive(Copy, Clone, PartialEq, Debug, LogicState)]
 enum SPISlaveState {
     Idle,
+    Armed,
     Capture,
     Hold,
     Update,
@@ -127,7 +128,8 @@ impl<const N: usize> Logic for SPISlave<N> {
         self.mclk_synchronizer.sig_in.next = self.mclk.val();
         self.csel_synchronizer.sig_in.next = self.msel.val();
         // Logic
-        self.busy.next = self.state.q.val() != SPISlaveState::Idle;
+        self.busy.next = (self.state.q.val() != SPISlaveState::Idle)
+            | (self.csel_synchronizer.sig_out.val() != self.cs_off.val());
         if self.state.q.val() != SPISlaveState::Disabled {
             self.miso.next = self.miso_flop.q.val();
         } else {
@@ -161,13 +163,18 @@ impl<const N: usize> Logic for SPISlave<N> {
                     self.continued_saved.d.next = self.continued_transaction.val();
                     self.pointer.d.next = self.bits.val() - 1_usize;
                     self.register_in.d.next = 0_u32.into();
+                    self.state.d.next = SPISlaveState::Armed;
+                } else if self.disabled.val() {
+                    self.state.d.next = SPISlaveState::Disabled;
+                }
+            }
+            SPISlaveState::Armed => {
+                if self.csel_synchronizer.sig_out.val() != self.cs_off.val() {
                     if self.cpha.val() & !self.continued_saved.q.val() {
                         self.state.d.next = SPISlaveState::Waiting;
                     } else {
                         self.state.d.next = SPISlaveState::Settle;
                     }
-                } else if self.disabled.val() {
-                    self.state.d.next = SPISlaveState::Disabled;
                 }
             }
             SPISlaveState::Waiting => {

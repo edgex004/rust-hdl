@@ -1,6 +1,6 @@
 use crate::ok_tools::ok_test_prelude;
 use rust_hdl_core::prelude::*;
-use rust_hdl_ok::mcb_if::MCBInterface;
+use rust_hdl_ok::mcb_if::MCBInterface1GDDR2;
 use rust_hdl_ok::mig::MemoryInterfaceGenerator;
 use rust_hdl_ok::ok_hi::OpalKellyHostInterface;
 use rust_hdl_ok::ok_host::OpalKellyHost;
@@ -16,7 +16,7 @@ use std::time::Duration;
 #[derive(LogicBlock)]
 pub struct OpalKellyXEM6010MIGTest {
     pub hi: OpalKellyHostInterface,
-    pub mcb: MCBInterface,
+    pub mcb: MCBInterface1GDDR2,
     pub raw_clock: Signal<In, Clock>,
     pub ok_host: OpalKellyHost,
     pub mig: MemoryInterfaceGenerator,
@@ -31,12 +31,12 @@ pub struct OpalKellyXEM6010MIGTest {
 
 impl Default for OpalKellyXEM6010MIGTest {
     fn default() -> Self {
-        let mut raw_clock = xem_6010_base_clock();
+        let raw_clock = xem_6010_base_clock();
         Self {
             hi: OpalKellyHostInterface::xem_6010(),
-            mcb: MCBInterface::xem_6010(),
+            mcb: MCBInterface1GDDR2::xem_6010(),
             raw_clock,
-            ok_host: Default::default(),
+            ok_host: OpalKellyHost::xem_6010(),
             mig: Default::default(),
             reset: WireIn::new(0x00),
             pipe_in: PipeIn::new(0x80),
@@ -113,7 +113,7 @@ fn test_opalkelly_xem_6010_mig() {
     uut.mcb.link_connect_dest();
     uut.raw_clock.connect();
     uut.connect_all();
-    crate::ok_tools::synth_obj(uut, "opalkelly_xem_6010_mig");
+    crate::ok_tools::synth_obj_6010(uut, "opalkelly_xem_6010_mig");
 }
 
 #[test]

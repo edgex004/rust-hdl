@@ -9,11 +9,18 @@ pub struct BlackBox {
 }
 
 #[derive(Debug, Clone)]
+pub struct Wrapper {
+    pub code: String,
+    pub cores: String,
+}
+
+#[derive(Debug, Clone)]
 pub enum Verilog {
     Empty,
     Combinatorial(VerilogBlock),
     Custom(String),
     Blackbox(BlackBox),
+    Wrapper(Wrapper),
 }
 
 impl Default for Verilog {
@@ -220,4 +227,5 @@ pub enum VerilogOpUnary {
     Neg,
     All,
     Any,
+    Xor,
 }

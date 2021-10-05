@@ -7,20 +7,29 @@ use ok_host::OpalKellyHost;
 use rust_hdl_core::prelude::*;
 use rust_hdl_widgets::pulser::Pulser;
 
+pub mod bsp;
 pub mod ddr_fifo;
+pub mod ddr_fifo7;
 pub mod mcb_if;
 pub mod mig;
+pub mod mig7;
+pub mod ok_download;
 pub mod ok_download_ddr;
+pub mod ok_download_ddr7;
 pub mod ok_hi;
 pub mod ok_host;
 pub mod ok_pipe;
+pub mod ok_sys_clock7;
 pub mod ok_trigger;
 pub mod ok_wire;
 pub mod pins;
 pub mod prelude;
 pub mod spi;
-pub mod synth;
+pub mod synth_6010;
+pub mod synth_7010;
+pub mod synth_common;
 pub mod ucf_gen;
+pub mod xdc_gen;
 
 const MHZ48: u64 = 48_000_000;
 
@@ -36,7 +45,7 @@ impl OKTest1 {
     pub fn new() -> Self {
         Self {
             hi: OpalKellyHostInterface::xem_6010(),
-            ok_host: OpalKellyHost::default(),
+            ok_host: OpalKellyHost::xem_6010(),
             led: pins::xem_6010_leds(),
             pulser: Pulser::new(MHZ48, 1.0, Duration::from_millis(500)),
         }

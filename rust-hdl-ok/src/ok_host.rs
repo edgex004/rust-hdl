@@ -1,6 +1,8 @@
 use rust_hdl_core::prelude::*;
 
+use crate::bsp::XEM6010;
 use crate::ok_hi::OpalKellyHostInterface;
+use rust_hdl_synth::TopWrap;
 
 #[derive(Clone, Debug, LogicBlock)]
 pub struct OpalKellyHost {
@@ -19,6 +21,7 @@ impl Logic for OpalKellyHost {
         self.hi.sig_out.connect();
         self.hi.sig_inout.connect();
         self.hi.sig_aa.connect();
+        self.hi.sig_mux.connect();
         self.ti_clk.connect();
     }
     fn hdl(&self) -> Verilog {
@@ -26,19 +29,22 @@ impl Logic for OpalKellyHost {
             code: r#"
 module OpalKellyHost
 	(
-	input  wire [7:0]  hi_sig_in,
-	output wire [1:0]  hi_sig_out,
-	inout  wire [15:0] hi_sig_inout,
-	inout  wire        hi_sig_aa,
+	input  wire [7:0]  hi$sig_in,
+	output wire [1:0]  hi$sig_out,
+	inout  wire [15:0] hi$sig_inout,
+	inout  wire        hi$sig_aa,
+	output wire        hi$sig_mux,
 	output wire        ti_clk,
 	output wire [30:0] ok1,
 	input  wire [16:0] ok2
 	);
 
-	okHost host(.hi_in(hi_sig_in),
-	            .hi_out(hi_sig_out),
-	            .hi_inout(hi_sig_inout),
-	            .hi_aa(hi_sig_aa),
+    assign hi$sig_mux = 1'b0;
+
+	okHost host(.hi_in(hi$sig_in),
+	            .hi_out(hi$sig_out),
+	            .hi_inout(hi$sig_inout),
+	            .hi_aa(hi$sig_aa),
 	            .ti_clk(ti_clk),
 	            .ok1(ok1),
 	            .ok2(ok2));
@@ -61,9 +67,18 @@ endmodule
     }
 }
 
-impl Default for OpalKellyHost {
-    fn default() -> Self {
+impl OpalKellyHost {
+    pub fn xem_6010() -> Self {
         let hi = OpalKellyHostInterface::xem_6010();
+        Self {
+            hi,
+            ok1: Signal::default(),
+            ok2: Signal::default(),
+            ti_clk: Signal::default(),
+        }
+    }
+    pub fn xem_7010() -> Self {
+        let hi = OpalKellyHostInterface::xem_7010();
         Self {
             hi,
             ok1: Signal::default(),
@@ -75,10 +90,7 @@ impl Default for OpalKellyHost {
 
 #[test]
 fn test_host_interface_synthesizes() {
-    use rust_hdl_synth::top_wrap;
-
-    top_wrap!(OpalKellyHost, Wrapper);
-    let mut uut: Wrapper = Default::default();
+    let mut uut = TopWrap::new(OpalKellyHost::xem_6010());
     uut.uut.ok2.connect();
     uut.uut.hi.sig_in.connect();
     uut.connect_all();

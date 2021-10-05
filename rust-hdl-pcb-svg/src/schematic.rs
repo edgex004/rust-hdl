@@ -6,16 +6,9 @@ use svg::node::element::{Circle, Text};
 use svg::node::element::{Group, Path};
 use svg::Document;
 
-use crate::adc::make_ads868x;
-use crate::circuit::{instance, Circuit, CircuitNode, PartDetails, PartInstance, PartPin};
-use crate::epin::{EPin, EdgeLocation};
-use crate::glyph::{estimate_bounding_box, Glyph, Rect, TextJustification};
-use crate::schematic_layout::{
-    make_rat_layout, NetLayoutCmd, SchematicLayout, SchematicOrientation, SchematicRotation,
-};
+use rust_hdl_pcb_core::prelude::*;
 
 const EM: i32 = 85;
-const PIN_LENGTH: i32 = 200;
 
 fn add_pins(
     mut doc: Group,
@@ -327,54 +320,6 @@ pub fn add_outline_to_path(doc: Group, g: &Glyph, hide_outline: bool) -> Group {
     }
 }
 
-pub fn make_flip_lr_part(part: &PartDetails) -> PartDetails {
-    let mut fpart = part.clone();
-    fpart.outline = part.outline.iter().map(|x| x.fliplr()).collect();
-    fpart.pins = part
-        .pins
-        .iter()
-        .map(|x| (*x.0, EPin::new(&x.1.name, x.1.kind, x.1.location.fliplr())))
-        .collect();
-    fpart
-}
-
-pub fn make_flip_ud_part(part: &PartDetails) -> PartDetails {
-    let mut fpart = part.clone();
-    fpart.outline = part.outline.iter().map(|x| x.flipud()).collect();
-    fpart.pins = part
-        .pins
-        .iter()
-        .map(|x| (*x.0, EPin::new(&x.1.name, x.1.kind, x.1.location.flipud())))
-        .collect();
-    fpart
-}
-
-pub fn get_details_from_instance(x: &PartInstance, l: &SchematicLayout) -> PartDetails {
-    let mut part = match &x.node {
-        CircuitNode::Capacitor(c) => &c.details,
-        CircuitNode::Resistor(r) => &r.details,
-        CircuitNode::Diode(d) => &d.details,
-        CircuitNode::Regulator(v) => &v.details,
-        CircuitNode::Inductor(l) => &l.details,
-        CircuitNode::IntegratedCircuit(u) => u,
-        CircuitNode::Connector(j) => j,
-        CircuitNode::Logic(u) => &u.details,
-        CircuitNode::Port(p) => p,
-    }
-    .clone();
-
-    let layout = l.part(&x.id);
-    if layout.flipped_lr {
-        part = make_flip_lr_part(&part);
-    }
-
-    if layout.flipped_ud {
-        part = make_flip_ud_part(&part);
-    }
-
-    part
-}
-
 fn make_rect_into_data(r: &Rect) -> Data {
     Data::new()
         .move_to((r.p0.x, -r.p0.y))
@@ -424,57 +369,6 @@ pub fn estimate_instance_bounding_box(instance: &PartInstance, layout: &Schemati
         r = r.rot90();
     }
     r
-}
-
-fn map_pin_based_on_orientation(orient: &SchematicOrientation, x: i32, y: i32) -> (i32, i32) {
-    let cx = orient.center.0;
-    let cy = orient.center.1;
-    return match orient.rotation {
-        SchematicRotation::Horizontal => (x + cx, -(y + cy)),
-        SchematicRotation::Vertical => (-y + cx, -(x + cy)),
-    };
-}
-
-fn map_pin_based_on_outline_and_orientation(
-    pin: &EPin,
-    r: &Rect,
-    orientation: &SchematicOrientation,
-    len: i32,
-) -> (i32, i32) {
-    return match &pin.location.edge {
-        EdgeLocation::North => {
-            map_pin_based_on_orientation(&orientation, pin.location.offset, r.p1.y + len)
-        }
-        EdgeLocation::West => {
-            map_pin_based_on_orientation(&orientation, r.p0.x - len, pin.location.offset)
-        }
-        EdgeLocation::East => {
-            map_pin_based_on_orientation(&orientation, r.p1.x + len, pin.location.offset)
-        }
-        EdgeLocation::South => {
-            map_pin_based_on_orientation(&orientation, pin.location.offset, r.p0.y - len)
-        }
-    };
-}
-
-fn get_pin_net_location(circuit: &Circuit, layout: &SchematicLayout, pin: &PartPin) -> (i32, i32) {
-    for instance in &circuit.nodes {
-        if instance.id == pin.part_id {
-            let part = get_details_from_instance(instance, layout);
-            let schematic_orientation = layout.part(&instance.id);
-            let pin = &part.pins[&pin.pin];
-            return if let Glyph::OutlineRect(r) = &part.outline[0] {
-                map_pin_based_on_outline_and_orientation(pin, r, &schematic_orientation, PIN_LENGTH)
-            } else {
-                // Parts without an outline rect are just virtual...
-                (
-                    schematic_orientation.center.0,
-                    -schematic_orientation.center.1,
-                )
-            };
-        }
-    }
-    panic!("No pin found!")
 }
 
 pub fn write_circuit_to_svg(circuit: &Circuit, layout: &SchematicLayout, name: &str) {
@@ -560,6 +454,48 @@ fn write_to_svg(instance: &PartInstance, layout: &SchematicLayout, name: &str) {
 
 // Color for the body of an IC: FFFDB0
 // Color for the schematic line: AE5E46
+
+#[cfg(test)]
+pub fn make_ads868x(part_number: &str) -> CircuitNode {
+    assert!(part_number.starts_with("ADS868"));
+    assert!(part_number.ends_with("IPW"));
+    let pins = vec![
+        pin!("DGND", PowerReturn, 300, South),
+        pin!("AVDD", PowerSink, -200, North),
+        pin!("AGND", PowerReturn, -200, South),
+        pin!("REFIO", Passive, 0, West),
+        pin!("REFGND", PowerReturn, -800, West),
+        pin!("REFCAP", Passive, -300, West),
+        pin!("AIN_P", Passive, 800, West),
+        pin!("AIN_GND", Passive, 400, West),
+        pin!("~RST", InputInverted, -900, East),
+        pin!("SDI", Input, -700, East),
+        pin!("CONVST/~CS", InputInverted, -500, East),
+        pin!("SCLK", Input, -300, East),
+        pin!("SDO-0", Output, -100, East),
+        pin!("ALARM/SDO-1/GPO", Output, 400, East),
+        pin!("RVS", Output, 700, East),
+        pin!("DVDD", PowerSink, 300, North),
+    ];
+    CircuitNode::IntegratedCircuit(PartDetails {
+        label: part_number.into(),
+        manufacturer: Manufacturer {
+            name: "TI".to_string(),
+            part_number: part_number.into(),
+        },
+        description: "16-bit high-speed single supply SAR ADC".to_string(),
+        comment: "".to_string(),
+        hide_pin_designators: false,
+        hide_part_outline: false,
+        pins: pin_list(pins),
+        outline: vec![
+            make_ic_body(-800, -1400, 900, 1200),
+            make_label(-800, 1200, "U?", TextJustification::BottomLeft),
+            make_label(-800, -1400, part_number, TextJustification::TopLeft),
+        ],
+        size: SizeCode::TSSOP(16),
+    })
+}
 
 #[test]
 fn test_svg_of_part() {

@@ -46,33 +46,59 @@ pub struct AD7193Simulator {
     conversion_counter: DFF<Bits<24>>,
 }
 
-#[cfg(test)]
-pub const AD7193_SPI_CONFIG: SPIConfig = SPIConfig {
-    clock_speed: 1_000_000,
-    cs_off: true,
-    mosi_off: true,
-    speed_hz: 10_000,
-    cpha: true,
-    cpol: true,
-};
+#[derive(Clone, Copy)]
+pub struct AD7193Config {
+    pub spi: SPIConfig,
+    pub sample_time: Duration,
+    pub auto_init: bool,
+}
 
-#[cfg(not(test))]
-pub const AD7193_SPI_CONFIG: SPIConfig = SPIConfig {
-    clock_speed: 48_000_000,
-    cs_off: true,
-    mosi_off: true,
-    speed_hz: 400_000,
-    cpha: true,
-    cpol: true,
-};
+impl AD7193Config {
+    pub fn hw() -> Self {
+        Self {
+            spi: SPIConfig {
+                clock_speed: 48_000_000,
+                cs_off: true,
+                mosi_off: true,
+                speed_hz: 400_000,
+                cpha: true,
+                cpol: true,
+            },
+            sample_time: Duration::from_micros(10100),
+            auto_init: false,
+        }
+    }
+    pub fn sw() -> Self {
+        Self {
+            spi: SPIConfig {
+                clock_speed: 1_000_000,
+                cs_off: true,
+                mosi_off: true,
+                speed_hz: 10_000,
+                cpha: true,
+                cpol: true,
+            },
+            sample_time: Duration::from_micros(100),
+            auto_init: false,
+        }
+    }
+}
 
 pub const AD7193_REG_WIDTHS: [u32; 8] = [8, 24, 24, 24, 8, 8, 24, 24];
 const AD7193_REG_INITS: [u64; 8] = [0x40, 0x80060, 0x117, 0x0, 0xa2, 0x0, 0x800000, 0x5544d0];
 
 impl AD7193Simulator {
-    pub fn new(spi_config: SPIConfig) -> Self {
+    pub fn new(config: AD7193Config) -> Self {
+        assert!(config.spi.clock_speed > 10 * config.spi.speed_hz);
         let reg_width_rom = AD7193_REG_WIDTHS.iter().map(|x| Bits::<5>::from(*x)).into();
         let reg_ram = AD7193_REG_INITS.iter().map(|x| Bits::<24>::from(*x)).into();
+        // The conversion time should really be 10 msec, but we instead tie it to the clock
+        // frequency.  Otherwise, it takes forever to simulate. - 40 nsec per period
+        let start_state = if !config.auto_init {
+            AD7193State::Init
+        } else {
+            AD7193State::Ready
+        };
         Self {
             mosi: Default::default(),
             mclk: Default::default(),
@@ -81,21 +107,15 @@ impl AD7193Simulator {
             clock: Default::default(),
             reg_width_rom,
             reg_ram,
-            oneshot: Shot::new(spi_config.clock_speed, Duration::from_micros(10000)),
+            oneshot: Shot::new(config.spi.clock_speed, config.sample_time),
             cmd: Default::default(),
             reg_index: Default::default(),
             rw_flag: Default::default(),
-            spi_slave: SPISlave::new(spi_config),
-            state: Default::default(),
+            spi_slave: SPISlave::new(config.spi),
+            state: DFF::new(start_state),
             reg_write_index: Default::default(),
             conversion_counter: Default::default(),
         }
-    }
-}
-
-impl Default for AD7193Simulator {
-    fn default() -> Self {
-        Self::new(AD7193_SPI_CONFIG)
     }
 }
 
@@ -158,7 +178,7 @@ impl Logic for AD7193Simulator {
                 }
             }
             AD7193State::ReadCmd => {
-                self.spi_slave.continued_transaction.next = false;
+                self.spi_slave.continued_transaction.next = true;
                 self.spi_slave.bits.next =
                     bit_cast::<16, 5>(self.reg_width_rom.data.val()) + 8_usize;
                 self.spi_slave.data_outbound.next =
@@ -168,7 +188,7 @@ impl Logic for AD7193Simulator {
                 self.state.d.next = AD7193State::WaitSlaveIdle;
             }
             AD7193State::WriteCmd => {
-                self.spi_slave.continued_transaction.next = false;
+                self.spi_slave.continued_transaction.next = true;
                 self.spi_slave.bits.next = bit_cast::<16, 5>(self.reg_width_rom.data.val());
                 self.spi_slave.data_outbound.next = 0xFFFFFFFF_u64.into();
                 self.spi_slave.start_send.next = true;
@@ -196,7 +216,7 @@ impl Logic for AD7193Simulator {
             }
             AD7193State::SingleConversion => {
                 self.spi_slave.disabled.next = true;
-                if !self.oneshot.active.val() {
+                if self.oneshot.fired.val() {
                     self.state.d.next = AD7193State::SingleConversionCommit;
                 }
             }
@@ -218,7 +238,7 @@ impl Logic for AD7193Simulator {
 
 #[test]
 fn test_ad7193_synthesizes() {
-    let mut uut = AD7193Simulator::default();
+    let mut uut = AD7193Simulator::new(AD7193Config::sw());
     uut.mosi.connect();
     uut.mclk.connect();
     uut.msel.connect();
@@ -250,17 +270,17 @@ impl Default for Test7193 {
     fn default() -> Self {
         Self {
             clock: Default::default(),
-            master: SPIMaster::new(AD7193_SPI_CONFIG),
-            adc: Default::default(),
+            master: SPIMaster::new(AD7193Config::sw().spi),
+            adc: AD7193Simulator::new(AD7193Config::sw()),
         }
     }
 }
 
 fn reg_read(
     reg_index: u32,
-    x: Test7193,
+    x: Box<Test7193>,
     sim: &mut Sim<Test7193>,
-) -> Result<(Bits<64>, Test7193), SimError> {
+) -> Result<(Bits<64>, Box<Test7193>), SimError> {
     let cmd = (((1 << 6) | (reg_index << 3)) << 24) as u64;
     let result = do_spi_txn(32, cmd, false, x, sim)?;
     let width = AD7193_REG_WIDTHS[reg_index as usize];
@@ -275,9 +295,9 @@ fn reg_read(
 fn reg_write(
     reg_index: u32,
     reg_value: u64,
-    x: Test7193,
+    x: Box<Test7193>,
     sim: &mut Sim<Test7193>,
-) -> Result<Test7193, SimError> {
+) -> Result<Box<Test7193>, SimError> {
     let mut cmd = (((0 << 6) | (reg_index << 3)) << 24) as u64;
     if AD7193_REG_WIDTHS[reg_index as usize] == 8 {
         cmd = cmd | reg_value << 16;
@@ -292,9 +312,9 @@ fn do_spi_txn(
     bits: u16,
     value: u64,
     continued: bool,
-    mut x: Test7193,
+    mut x: Box<Test7193>,
     sim: &mut Sim<Test7193>,
-) -> Result<(Bits<64>, Test7193), SimError> {
+) -> Result<(Bits<64>, Box<Test7193>), SimError> {
     wait_clock_true!(sim, clock, x);
     x.master.data_outbound.next = value.into();
     x.master.bits_outbound.next = bits.into();
@@ -334,7 +354,7 @@ fn test_yosys_validate_test_fixture() {
 fn test_reg_reads() {
     let uut = mk_test7193();
     let mut sim = Simulation::new();
-    sim.add_clock(5, |x: &mut Test7193| x.clock.next = !x.clock.val());
+    sim.add_clock(5, |x: &mut Box<Test7193>| x.clock.next = !x.clock.val());
     sim.add_testbench(move |mut sim: Sim<Test7193>| {
         let mut x = sim.init()?;
         // Do the first read to initialize the chip
@@ -354,14 +374,14 @@ fn test_reg_reads() {
         }
         sim.done(x)
     });
-    sim.run(uut, 1_000_000).unwrap();
+    sim.run(Box::new(uut), 1_000_000).unwrap();
 }
 
 #[test]
 fn test_reg_writes() {
     let uut = mk_test7193();
     let mut sim = Simulation::new();
-    sim.add_clock(5, |x: &mut Test7193| x.clock.next = !x.clock.val());
+    sim.add_clock(5, |x: &mut Box<Test7193>| x.clock.next = !x.clock.val());
     sim.add_testbench(move |mut sim: Sim<Test7193>| {
         let mut x = sim.init()?;
         // Initialize the chip...
@@ -386,14 +406,14 @@ fn test_reg_writes() {
         }
         sim.done(x)
     });
-    sim.run(uut, 1_000_000).unwrap();
+    sim.run(Box::new(uut), 1_000_000).unwrap();
 }
 
 #[test]
 fn test_single_conversion() {
     let uut = mk_test7193();
     let mut sim = Simulation::new();
-    sim.add_clock(5, |x: &mut Test7193| x.clock.next = !x.clock.val());
+    sim.add_clock(5, |x: &mut Box<Test7193>| x.clock.next = !x.clock.val());
     sim.add_testbench(move |mut sim: Sim<Test7193>| {
         let mut x = sim.init()?;
         // Initialize the chip...
@@ -415,5 +435,5 @@ fn test_single_conversion() {
         }
         sim.done(x)
     });
-    sim.run(uut, 10_000_000).unwrap();
+    sim.run(Box::new(uut), 10_000_000).unwrap();
 }
