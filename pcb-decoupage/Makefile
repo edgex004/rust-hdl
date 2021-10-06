@@ -5,10 +5,13 @@ DIST_FILES = $(shell find ./client/dist -type f -name '*')
 
 all: pcb-decoupage
 
+pcb-to-svg/pkg:
+	cd pcb-to-svg && wasm-pack build
+
 client/node_modules: client/package.json
 	cd client && npm install
 
-client/dist: client/node_modules $(CLIENT_SRC_FILES)
+client/dist: client/node_modules pcb-to-svg/pkg $(CLIENT_SRC_FILES)
 	cd client && npm run copy_images && ng build
 
 server/target/release: client/dist $(DIST_FILES) $(SERVER_SRC_FILES)
@@ -19,4 +22,5 @@ pcb-decoupage: server/target/release
 
 clean: 
 	cd client && rm -rf node_modules/
-	cd server && cargo clean
+	cd server && rm -rf server/target/release && cargo clean
+	cd pcb-to-svg && rm -rf pkg && cargo clean
